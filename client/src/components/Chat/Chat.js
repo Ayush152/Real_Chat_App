@@ -11,7 +11,7 @@ import './Chat.css';
 
 let socket;
 
-const Chat = ({ location, history }) => {
+const Chat = ({ location }) => {
 	const [name, setName] = useState('');
 	const [room, setRoom] = useState('');
 	const [users, setUsers] = useState('');
@@ -33,11 +33,22 @@ const Chat = ({ location, history }) => {
 				// history.push('/');
 			}
 		});
+
+		return () => {
+			socket.emit('disconnect');
+			socket.off();
+		};
 	}, [ENDPOINT, location.search]);
 
 	useEffect(() => {
 		socket.on('message', (message) => {
-			setMessages((messages) => [...messages, message]);
+			if (message.user === 'GPT-3') {
+				// Handle GPT response (e.g., visually distinguish it)
+				setMessages((messages) => [...messages, message]);
+			} else {
+				// Handle regular user message
+				setMessages((messages) => [...messages, message]);
+			}
 		});
 
 		socket.on('roomData', ({ users }) => {

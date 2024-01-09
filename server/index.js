@@ -1,17 +1,20 @@
-const http = require('http');
-const express = require('express');
-const socketio = require('socket.io');
-// const cors = require('cors');
+import http from 'http';
+import express from 'express';
+import socketio from 'socket.io';
 
-const { addUser, removeUser, getUser, getUsersInRoom } = require('./users');
+import OpenAI from 'openai';
 
-const router = require('./router');
+const openai = new OpenAI({
+  apiKey: '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'
+});
+
+import { addUser, removeUser, getUser, getUsersInRoom } from './users.js';
+import { router } from './router.js'
 
 const app = express();
 const server = http.createServer(app);
 const io = socketio(server);
 
-// app.use(cors());
 app.use(router);
 
 io.on('connect', (socket) => {
@@ -39,11 +42,32 @@ io.on('connect', (socket) => {
 	});
 
 	socket.on('sendMessage', (message, callback) => {
+		// io.to(user.room).emit('message', { user: user.name, text: message });
+
 		const user = getUser(socket.id);
 
-		io.to(user.room).emit('message', { user: user.name, text: message });
+		// Call OpenAI API to generate response
+		openai.chat.completions.create({
+			messages: [{ role: "system", content: "You are a helpful assistant." }],
+    		model: "babbage-002",
+			temperature: 0.7, // Adjust creativity level
+			max_tokens: 500, // Adjust response length
+		})
+		.then((response) => {
+			const gptResponse = response.choices[0].message;
 
-		callback();
+			// Broadcast both user message and GPT response
+			io.to(user.room).emit('message', { user: user.name, text: message });
+			io.to(user.room).emit('message', { user: 'GPT-3', text: gptResponse });
+
+			callback();
+		})
+		.catch((error) => {
+			console.error('OpenAI API error:', error);
+			// Handle API errors gracefully (e.g., send error message to user)
+			callback();
+		});
+
 	});
 
 	socket.on('disconnect', () => {
